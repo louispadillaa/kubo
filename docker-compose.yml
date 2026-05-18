@@ -1,0 +1,143 @@
+version: '3.9'
+
+services:
+
+  # ── FRONTEND ──────────────────────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: bw-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - bw-net
+
+  # ── API SPRING BOOT ───────────────────────────────────────────────────────
+  api:
+    build: ./api
+    container_name: bw-api
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/buywise
+      - SPRING_DATASOURCE_USERNAME=buywise
+      - SPRING_DATASOURCE_PASSWORD=buywise123
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=buywise-realm
+      - SCRAPING_SERVICE_URL=http://scraping:8001
+      - ML_SERVICE_URL=http://ml-service:8002
+    depends_on:
+      - postgres
+      - redis
+      - keycloak
+    networks:
+      - bw-net
+
+  # ── SCRAPING SERVICE ──────────────────────────────────────────────────────
+  scraping:
+    build: ./scraping
+    container_name: bw-scraping
+    ports:
+      - "8001:8001"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://buywise:buywise123@postgres:5432/buywise
+      - KEYCLOAK_URL=http://keycloak:8089
+      - KEYCLOAK_REALM=buywise-realm
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - bw-net
+
+  # ── ML SERVICE ────────────────────────────────────────────────────────────
+  ml-service:
+    build: ./ml-service
+    container_name: bw-ml
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - KEYCLOAK_URL=${KEYCLOAK_URL}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM}
+    volumes:
+      - ml-models:/app/models
+    depends_on:
+      - postgres
+    networks:
+      - bw-net
+
+  # ── KEYCLOAK ──────────────────────────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.1
+    container_name: bw-keycloak
+    command: start-dev --import-realm
+    ports:
+      - "8180:8080"
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KC_DB=${KC_DB}
+      - KC_DB_URL=${KC_DB_URL}
+      - KC_DB_USERNAME=${KC_DB_USERNAME}
+      - KC_DB_PASSWORD=${KC_DB_PASSWORD}
+    volumes:
+      - ./keycloak/buywise-realm.json:/opt/keycloak/data/import/buywise-realm.json
+    depends_on:
+      - keycloak-db
+    networks:
+      - bw-net
+
+  # ── KEYCLOAK DB ───────────────────────────────────────────────────────────
+  keycloak-db:
+    image: postgres:16-alpine
+    container_name: bw-keycloak-db
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    networks:
+      - bw-net
+
+  # ── POSTGRESQL ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: bw-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./api/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - bw-net
+
+  # ── REDIS ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: bw-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - bw-net
+
+volumes:
+  postgres-data:
+  redis-data:
+  ml-models:
+  keycloak-db-data:
+
+networks:
+  bw-net:
+    driver: bridge

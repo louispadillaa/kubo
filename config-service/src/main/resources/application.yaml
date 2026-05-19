@@ -11,5 +11,3 @@ spring:
       server:
         native:
           search-locations: classpath:/configurations
-  config:
-    import: optional:file:../.env[.properties]

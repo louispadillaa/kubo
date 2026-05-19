@@ -1,74 +1,4 @@
-version: '3.9'
-
 services:
-
-  # ── FRONTEND ──────────────────────────────────────────────────────────────
-  frontend:
-    build: ./frontend
-    container_name: bw-frontend
-    ports:
-      - "3000:80"
-    depends_on:
-      - api
-    networks:
-      - bw-net
-
-  # ── API SPRING BOOT ───────────────────────────────────────────────────────
-  api:
-    build: ./api
-    container_name: bw-api
-    ports:
-      - "8080:8080"
-    environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/buywise
-      - SPRING_DATASOURCE_USERNAME=buywise
-      - SPRING_DATASOURCE_PASSWORD=buywise123
-      - SPRING_REDIS_HOST=redis
-      - SPRING_REDIS_PORT=6379
-      - KEYCLOAK_URL=http://keycloak:8080
-      - KEYCLOAK_REALM=buywise-realm
-      - SCRAPING_SERVICE_URL=http://scraping:8001
-      - ML_SERVICE_URL=http://ml-service:8002
-    depends_on:
-      - postgres
-      - redis
-      - keycloak
-    networks:
-      - bw-net
-
-  # ── SCRAPING SERVICE ──────────────────────────────────────────────────────
-  scraping:
-    build: ./scraping
-    container_name: bw-scraping
-    ports:
-      - "8001:8001"
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql://buywise:buywise123@postgres:5432/buywise
-      - KEYCLOAK_URL=http://keycloak:8089
-      - KEYCLOAK_REALM=buywise-realm
-    depends_on:
-      - redis
-      - postgres
-    networks:
-      - bw-net
-
-  # ── ML SERVICE ────────────────────────────────────────────────────────────
-  ml-service:
-    build: ./ml-service
-    container_name: bw-ml
-    ports:
-      - "8002:8002"
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - KEYCLOAK_URL=${KEYCLOAK_URL}
-      - KEYCLOAK_REALM=${KEYCLOAK_REALM}
-    volumes:
-      - ml-models:/app/models
-    depends_on:
-      - postgres
-    networks:
-      - bw-net
 
   # ── KEYCLOAK ──────────────────────────────────────────────────────────────
   keycloak:
@@ -111,9 +41,8 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_USER= postgres
+      - POSTGRES_PASSWORD= louispadillaa
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./api/src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -140,4 +69,6 @@ volumes:
 
 networks:
   bw-net:
+    driver: bridge
+  microservices-net:
     driver: bridge

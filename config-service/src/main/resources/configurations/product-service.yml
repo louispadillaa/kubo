@@ -1,16 +1,27 @@
 server:
-  port: 8081
+  port: 9091
 
 spring:
   application:
     name: product-service
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/payment
-    username:
-    password:
+    url: jdbc:postgresql://localhost:5432/product
+    username: postgres
+    password: louispadillaa
   jpa:
     hibernate:
       ddl-auto: create
     database: postgresql
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka
+
+logging:
+  level:
+    com.kubo: DEBUG

@@ -6,8 +6,11 @@
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/config-service/kubo.config-service.test.iml" filepath="$PROJECT_DIR$/.idea/modules/config-service/kubo.config-service.test.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/gateway-service/kubo.gateway-service.main.iml" filepath="$PROJECT_DIR$/.idea/modules/gateway-service/kubo.gateway-service.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/gateway-service/kubo.gateway-service.test.iml" filepath="$PROJECT_DIR$/.idea/modules/gateway-service/kubo.gateway-service.test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/product-service/kubo.product-service.main.iml" filepath="$PROJECT_DIR$/.idea/modules/product-service/kubo.product-service.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/purchase-service/kubo.purchase-service.main.iml" filepath="$PROJECT_DIR$/.idea/modules/purchase-service/kubo.purchase-service.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/registry-service/kubo.registry-service.main.iml" filepath="$PROJECT_DIR$/.idea/modules/registry-service/kubo.registry-service.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/registry-service/kubo.registry-service.test.iml" filepath="$PROJECT_DIR$/.idea/modules/registry-service/kubo.registry-service.test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/search-service/kubo.search-service.main.iml" filepath="$PROJECT_DIR$/.idea/modules/search-service/kubo.search-service.main.iml" />
     </modules>
   </component>
 </project>

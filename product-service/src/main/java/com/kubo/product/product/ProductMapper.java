@@ -32,7 +32,7 @@ public class ProductMapper {
 
         return ProductSuggestResponse.builder()
                 .id(product.getId())
-                .name(product.getName())
+                .nameNormalized(product.getNameNormalized())
                 .brand(product.getBrand())
                 .category(product.getCategory())
                 .imageUrl(imageUrl)
@@ -60,7 +60,7 @@ public class ProductMapper {
 
         return ProductDetailResponse.builder()
                 .id(product.getId())
-                .name(product.getName())
+                .name(product.getNameNormalized())
                 .brand(product.getBrand())
                 .category(product.getCategory())
                 .unit(product.getUnit())
@@ -87,7 +87,7 @@ public class ProductMapper {
 
         return PriceHistoryResponse.builder()
                 .productId(product.getId())
-                .productName(product.getName())
+                .productName(product.getNameNormalized())
                 .store(store)
                 .history(points)
                 .historicalMin(min)

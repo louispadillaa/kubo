@@ -21,16 +21,16 @@ public interface ProductRespository extends JpaRepository<Product, UUID> {
     //Busca un producto por nombre
     @Query(value = """
         SELECT * FROM products
-        WHERE to_tsvector('spanish', name) @@ plainto_tsquery('spanish', :query)
-        ORDER BY ts_rank(to_tsvector('spanish', name), plainto_tsquery('spanish', :query)) DESC
+        WHERE to_tsvector('spanish', name_normalized) @@ plainto_tsquery('spanish', :query)
+        ORDER BY ts_rank(to_tsvector('spanish', name_normalized), plainto_tsquery('spanish', :query)) DESC
         LIMIT :limit
         """, nativeQuery = true)
     List<Product> searchByName(@Param("query") String query, @Param("limit") int limit);
 
     //Buscar nombre por categoría
-    List<Product> findByCategoryIgnoreCaseOrderByName(String category);
+    List<Product> findByCategoryIgnoreCaseOrderByNameNormalized(String category);
 
-    boolean existsByName(String name);
+    boolean existsByNameNormalized(String nameNormalized);
 
 
 }

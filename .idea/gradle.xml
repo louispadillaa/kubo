@@ -12,7 +12,9 @@
             <option value="$PROJECT_DIR$/config-service" />
             <option value="$PROJECT_DIR$/gateway-service" />
             <option value="$PROJECT_DIR$/product-service" />
+            <option value="$PROJECT_DIR$/purchase-service" />
             <option value="$PROJECT_DIR$/registry-service" />
+            <option value="$PROJECT_DIR$/search-service" />
           </set>
         </option>
       </GradleProjectSettings>

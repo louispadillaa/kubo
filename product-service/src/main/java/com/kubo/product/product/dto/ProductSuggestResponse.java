@@ -8,7 +8,7 @@ import java.util.UUID;
 @Builder
 public record ProductSuggestResponse(
         UUID id,
-        String name,
+        String nameNormalized,
         String brand,
         String category,
         String imageUrl,

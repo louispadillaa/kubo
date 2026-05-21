@@ -16,7 +16,7 @@ public interface ProductSnapshotRepository extends JpaRepository<ProductSnapshot
 
     //Busca en la tabla de snapshots y te dice cuánto cuesta el producto hoy en el Éxito, cuánto en Carulla, cuánto en Olímpica, etc.
     @Query(value = """
-        SELECT DISTINT ON (ps.store) ps. *
+        SELECT DISTINCT ON (ps.store) ps. *
         FROM product_snapshots ps
         WHERE ps.product_id = :productId
             AND ps.available = true

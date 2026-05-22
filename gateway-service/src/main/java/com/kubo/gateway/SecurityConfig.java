@@ -20,6 +20,7 @@ public class SecurityConfig {
                         .pathMatchers("/eureka/**").permitAll()
                         .pathMatchers("/api/products/**").permitAll()  // <-- AGREGA ESTA LÍNEA
                         .pathMatchers("/api/purchase/**").permitAll()
+                        .pathMatchers("/api/search/**").permitAll()
                         .anyExchange()
                         .authenticated()
                 )

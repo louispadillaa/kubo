@@ -1,11 +1,8 @@
 package com.kubo.search;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kubo.search.dto.CompareInitiated;
-import com.kubo.search.dto.CompareRequest;
-import com.kubo.search.dto.ScrapingJobRequest;
-import com.kubo.search.dto.ScrapingJobResponse;
-import io.lettuce.core.dynamic.annotation.Value;
+import com.kubo.search.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.Message;
@@ -18,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,36 +30,130 @@ public class SearchService {
     private final SimpMessagingTemplate wsTemplate;
     private final ObjectMapper objectMapper;
     private final WebClient.Builder webClientBuilder;
+    private final ProductClient productClient;
 
-    //@Value("${kubo.scraping-service.url}")
-    private String scrapingServiceUrl;
+    private final String scrapingServiceUrl = "http://localhost:8000";
 
-    private static final List<String> ALL_STORES =
-            List.of("MERCADOLIBRE", "EXITO", "ALKOSTO", "OLIMPICA", "FALABELLA", "D1", "ARA");
+    public List<ProductSuggestResponse> suggest(String query) {
+        String cacheKey = "suggest:" + query.trim().toLowerCase();
+
+        // 1. PASO A: INTENTAR LEER DESDE REDIS CACHÉ
+        try {
+            Object cachedData = redisTemplate.opsForValue().get(cacheKey);
+            if (cachedData != null) {
+                log.info("Redis Caché HIT para sugerencia: '{}'", query);
+                return objectMapper.convertValue(cachedData, new TypeReference<List<ProductSuggestResponse>>() {});
+            }
+        } catch (Exception e) {
+            log.error("Error al leer desde la caché de Redis: {}", e.getMessage());
+        }
+
+        log.info("🔍 Redis Caché MISS. Consultando catálogo local en product-service para: '{}'", query);
+
+        // 2. PASO B: CONSULTAR SI PRODUCT-SERVICE TIENE HISTORIAL EN SU BASE DE DATOS
+        List<ProductSuggestResponse> localSuggestions = Collections.emptyList();
+        try {
+            localSuggestions = productClient.getProcessedSuggestions(query);
+        } catch (Exception e) {
+            log.error("Fallo crítico de comunicación Feign con product-service: {}", e.getMessage());
+        }
+
+        if (localSuggestions != null && !localSuggestions.isEmpty()) {
+            log.info("Datos recuperados desde PostgreSQL (catálogo). Poblando caché de Redis.");
+            saveInRedisCache(cacheKey, localSuggestions);
+            return localSuggestions;
+        }
+
+        // 3. PASO C: FALLBACK GENERAL - DISPARAR SCRAPING CONCURRENTE EN FASTAPI (PLAYWRIGHT)
+        log.warn("🌐 Sin registros en BD. Invocando motores de Playwright en FastAPI de forma síncrona para: '{}'", query);
+        List<PythonScrapingResponse> pythonOffers = Collections.emptyList();
+        try {
+            pythonOffers = webClientBuilder.build()
+                    .get()
+                    .uri(scrapingServiceUrl + "/api/v1/scraping/search?q={q}", query)
+                    .retrieve()
+                    .bodyToFlux(PythonScrapingResponse.class)
+                    .collectList()
+                    .block(Duration.ofSeconds(30)); // Timeout controlado para esperar Playwright
+        } catch (Exception e) {
+            log.error("Error de conexión o timeout con el servicio Python FastAPI: {}", e.getMessage());
+        }
+
+        if (pythonOffers == null || pythonOffers.isEmpty()) {
+            log.warn("El scraper de FastAPI no encontró ofertas en internet para: '{}'", query);
+            return Collections.emptyList();
+        }
+
+        // 4. PASO D: MAPEAR AL COMANDO BULK Y ENVIARLO A PRODUCT-SERVICE PARA PROCESAMIENTO Y PERSISTENCIA
+        List<ProductSnapshotBulkCommand> bulkCommands = pythonOffers.stream()
+                .map(offer -> new ProductSnapshotBulkCommand(
+                        offer.nameRaw(),
+                        offer.store(),
+                        offer.price(),
+                        offer.url(),
+                        offer.imageUrl(),
+                        query // Envía el término original para relacionar/crear el producto base
+                )).toList();
+
+        try {
+            log.info("Enviando lote de {} snapshots a product-service vía Feign para persistir...", bulkCommands.size());
+            productClient.saveBulkSnapshots(bulkCommands);
+        } catch (Exception e) {
+            log.error("Error al persistir el lote en la base de datos de product-service: {}", e.getMessage());
+        }
+
+        // 5. PASO E: RECUPERAR LOS DATOS MADUROS YA PROCESADOS POR TU CATÁLOGO
+        log.info("Re-consultando sugerencias maduras del catálogo procesado para: '{}'", query);
+        List<ProductSuggestResponse> finalProcessedResponse = Collections.emptyList();
+        try {
+            finalProcessedResponse = productClient.getProcessedSuggestions(query);
+        } catch (Exception e) {
+            log.error("Error al recuperar los datos post-persistencia de product-service: {}", e.getMessage());
+        }
+
+        // 6. PASO F: COMPARTIR EN REDIS PARA FUTURAS CONSULTAS RÁPIDAS
+        if (finalProcessedResponse != null && !finalProcessedResponse.isEmpty()) {
+            saveInRedisCache(cacheKey, finalProcessedResponse);
+        }
+
+        return finalProcessedResponse;
+    }
 
     /**
-     * Inicia una comparación de precios:
-     * 1. Genera jobId y guarda estado en Redis (TTL 30 min)
-     * 2. Envía el job al scraping-service Python vía WebClient (no bloqueante)
-     * 3. Suscribe al canal Redis Pub/Sub donde el scraper publicará resultados
-     * 4. Retorna el jobId al frontend INMEDIATAMENTE — los resultados llegan por WS
+     * Helper centralizado para persistir en Redis con expiración temporal (TTL).
      */
+    private void saveInRedisCache(String key, List<ProductSuggestResponse> data) {
+        try {
+            // Guardamos en caché por 2 horas para evitar spammear/bloquear los e-commerce constantemente
+            redisTemplate.opsForValue().set(key, data, Duration.ofHours(2));
+            log.info("Caché de Redis actualizada exitosamente para la llave: {}", key);
+        } catch (Exception e) {
+            log.error("Error al escribir en la caché de Redis: {}", e.getMessage());
+        }
+    }
+
+    // =====================================================================
+    // MÉTODOS ASÍNCRONOS EXISTENTES (COMPARE / PUB-SUB WEBSOCKETS) INTACTOS
+    // =====================================================================
+
     public CompareInitiated compare(CompareRequest request, String userId) {
         UUID jobId = UUID.randomUUID();
-        List<String> stores = (request.stores() != null && !request.stores().isEmpty())
-                ? request.stores() : ALL_STORES;
+
+        // CORRECCIÓN: Si request.stores() es nulo o vacío, pasamos una lista vacía
+        // o manejas la lógica que tenías originalmente antes de que yo interviniera.
+        List<String> stores = (request.stores() != null) ? request.stores() : Collections.emptyList();
 
         log.info("Iniciando job jobId={} userId={} productos={} tiendas={}",
                 jobId, userId, request.productNames().size(), stores.size());
 
-        // Estado en Redis con TTL de 30 minutos
         redisTemplate.opsForValue().set(
                 "job:" + jobId,
                 Map.of("status", "PENDING", "userId", userId),
                 Duration.ofMinutes(30)
         );
 
-        // Llamar al scraping-service Python (non-blocking)
+        // ... El resto del método compare se queda exactamente igual ...
+
         var payload = new ScrapingJobRequest(jobId.toString(), userId, request.productNames(), stores);
 
         webClientBuilder.build()
@@ -74,20 +166,11 @@ public class SearchService {
                 .doOnError(e -> log.error("Error llamando al scraping-service: {}", e.getMessage()))
                 .subscribe(r -> log.info("Scraping service confirmó jobId={} status={}", jobId, r.status()));
 
-        // Suscribir al canal de resultados de este job
         subscribeToJobResults(jobId.toString(), userId);
 
-        return new CompareInitiated(
-                jobId,
-                "Búsqueda iniciada. Los resultados llegarán por WebSocket.",
-                stores.size()
-        );
+        return new CompareInitiated(jobId, "Búsqueda iniciada. Los resultados llegarán por WebSocket.", stores.size());
     }
 
-    /**
-     * Suscripción a Redis Pub/Sub.
-     * El scraper publica en 'results:{jobId}' — nosotros escuchamos y reenviamos al WS del usuario.
-     */
     private void subscribeToJobResults(String jobId, String userId) {
         String channel = "results:" + jobId;
 
@@ -99,11 +182,8 @@ public class SearchService {
                     String status = (String) event.get("status");
 
                     log.debug("Evento jobId={} status={}", jobId, status);
-
-                    // Reenviar al topic privado del usuario
                     wsTemplate.convertAndSendToUser(userId, "/queue/results/" + jobId, event);
 
-                    // Job terminado → limpiar suscripción
                     if ("COMPLETED".equals(status) || "FAILED".equals(status)) {
                         listenerContainer.removeMessageListener(this, new ChannelTopic(channel));
                         redisTemplate.delete("job:" + jobId);

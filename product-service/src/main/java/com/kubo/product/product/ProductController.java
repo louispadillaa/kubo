@@ -2,6 +2,7 @@ package com.kubo.product.product;
 
 import com.kubo.product.product.dto.PriceHistoryResponse;
 import com.kubo.product.product.dto.ProductDetailResponse;
+import com.kubo.product.product.dto.ProductSnapshotBulkCommand;
 import com.kubo.product.product.dto.ProductSuggestResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,14 @@ public class ProductController {
 
     private final ProductService productService;
 
-    @GetMapping("/suggest")
+    // Search llama aquí para ordenarle a Product que guarde los datos que consiguió de FastAPI
+    @PostMapping("/snapshots/bulk")
+    public ResponseEntity<Void> saveBulkSnapshots(@RequestBody List<ProductSnapshotBulkCommand> command) {
+        productService.persistBulkSnapshots(command);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/product")
     public ResponseEntity<List<ProductSuggestResponse>> suggest(
             @RequestParam(name = "q") String query) {
         return ResponseEntity.ok(productService.suggest(query));

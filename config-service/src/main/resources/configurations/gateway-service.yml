@@ -53,6 +53,11 @@ spring:
               predicates:
                 - Path=/api/purchase/**
 
+            - id: kubo-fastapi
+              uri: 'http://localhost:8000'
+              predicates:
+                - Path=/api/v1/scraping/**, /api/v1/ml/**
+
 eureka:
   client:
     service-url:

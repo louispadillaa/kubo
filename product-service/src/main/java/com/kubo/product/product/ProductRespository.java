@@ -33,4 +33,5 @@ public interface ProductRespository extends JpaRepository<Product, UUID> {
     boolean existsByNameNormalized(String nameNormalized);
 
 
+    Optional<Product> findByNameNormalizedIgnoreCase(String trim);
 }

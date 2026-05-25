@@ -13,6 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/search")
 @RequiredArgsConstructor
+@CrossOrigin
 public class SearchController {
 
     private final SearchService searchService;
@@ -28,6 +29,21 @@ public class SearchController {
         }
 
         // Ejecutamos la orquestación del servicio
+        List<ProductSuggestResponse> responses = searchService.suggest(query);
+        return ResponseEntity.ok(responses);
+    }
+
+    // 2. EL NUEVO ENDPOINT: Para la búsqueda profunda (Al dar Enter o clic en Buscar)
+    @GetMapping // Al no ponerle un path interno, escucha directamente en "/api/search"
+    public ResponseEntity<List<ProductSuggestResponse>> search(
+            @RequestParam(name = "q") String query) {
+
+        // Validación defensiva idéntica
+        if (query == null || query.trim().length() < 3) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Reutilizamos tu potente orquestación distribuida
         List<ProductSuggestResponse> responses = searchService.suggest(query);
         return ResponseEntity.ok(responses);
     }

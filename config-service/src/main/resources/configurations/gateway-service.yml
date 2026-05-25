@@ -12,51 +12,53 @@ spring:
 
   cloud:
     gateway:
-      server:
-        webflux: # <- Añadido para cumplir con la nueva estructura reactiva
-          discovery:
-            locator:
-              enabled: true
-              lower-case-service-id: true
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 30s
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:4321"
+            allowedMethods: [ "GET", "POST", "PUT", "DELETE", "OPTIONS" ]
+            allowedHeaders: [ "*" ]
+            allowCredentials: true
 
-          globalcors:
-            cors-configurations:
-              '[/**]':
-                allowed-origins:
-                  - "http://localhost:3000"
-                  - "http://localhost:5173"
-                allowed-methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-                allowed-headers: ["*"]
-                allow-credentials: true
+      webflux:
+        environment:
 
-          routes:
-            - id: product
-              uri: 'http://localhost:9091'
-              predicates:
-                - Path=/api/products/**
-              filters:
-                - AddRequestHeader=X-Internal-Source, gateway
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
 
-            - id: search
-              uri: 'http://localhost:9092'
-              predicates:
-                - Path=/api/search/**
-              filters:
-                - name: JwtAuthFilter
-                - name: CircuitBreaker
-                  args:
-                    name: search-cb
-                    fallbackUri: forward:/fallback/search
+      routes:
+        - id: product
+          uri: 'http://localhost:9091'
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - AddRequestHeader=X-Internal-Source, gateway
 
-            - id: purchase
-              uri: 'http://localhost:9093'
-              predicates:
-                - Path=/api/purchase/**
+        - id: search
+          uri: 'http://localhost:9092'
+          predicates:
+            - Path=/api/search, /api/search/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: search-cb
+                fallbackUri: forward:/fallback/search
 
-            - id: kubo-fastapi
-              uri: 'http://localhost:8000'
-              predicates:
-                - Path=/api/v1/scraping/**, /api/v1/ml/**
+        - id: purchase
+          uri: 'http://localhost:9093'
+          predicates:
+            - Path=/api/purchase/**
+
+        - id: kubo-fastapi
+          uri: 'http://localhost:8000'
+          predicates:
+            - Path=/api/v1/scraping/**, /api/v1/ml/**
 
 eureka:
   client:

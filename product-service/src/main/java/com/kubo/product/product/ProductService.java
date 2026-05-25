@@ -45,6 +45,8 @@ public class ProductService {
                 .orElseGet(() -> productRepository.save(
                         Product.builder()
                                 .nameNormalized(queryClave.trim())
+                                .brand(commands.get(0).brand() == null ? "Genérico" : commands.get(0).brand())       // <-- AGREGAR
+                                .category(commands.get(0).category() == null ? "General" : commands.get(0).category()) // <-- AGREGAR
                                 .createdAt(Instant.now())
                                 .build()
                 ));

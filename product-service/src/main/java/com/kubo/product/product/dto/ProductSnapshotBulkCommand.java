@@ -8,6 +8,9 @@ public record ProductSnapshotBulkCommand(
         BigDecimal price,
         String url,
         String imageUrl,
+        String brand,
+        String category,
         String baseProductQuery
+
 ) {
 }
